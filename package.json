@@ -9,7 +9,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "token": "tsx --env-file=.env scripts/generate-token.ts",
-    "test": "tsx --test test/correlation-envelope.test.ts test/workflow-reply.test.ts"
+    "test": "tsx --test test/correlation-envelope.test.ts test/workflow-reply.test.ts test/idempotency-store.test.ts"
   },
   "keywords": [
     "fastify",
