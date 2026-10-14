@@ -1,7 +1,7 @@
 {
   "name": "gateway-service",
   "version": "1.0.0",
-  "description": "Gateway Service — Fastify API gateway",
+  "description": "Gateway Service \u2014 Fastify API gateway",
   "main": "dist/server.js",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch src/server.ts",
@@ -9,9 +9,13 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "token": "tsx --env-file=.env scripts/generate-token.ts",
-    "test": "tsx --test test/correlation-envelope.test.ts"
+    "test": "tsx --test test/correlation-envelope.test.ts test/workflow-reply.test.ts"
   },
-  "keywords": ["fastify", "gateway", "api"],
+  "keywords": [
+    "fastify",
+    "gateway",
+    "api"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=20"

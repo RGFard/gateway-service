@@ -1,23 +1,17 @@
 /**
- * Shape of the Integration Intelligence Engine's (nexus-engine) full response
- * to POST /ai/normalize, as passed through verbatim by n8n. Internal only —
- * never forwarded to the gateway's caller as-is; see ShipmentService.shapeResponse.
+ * What the n8n workflow returns, and what the gateway forwards to the caller of
+ * POST /shipments. n8n does the shaping (Respond to Webhook node); the gateway
+ * checks the shape and passes it through.
  */
-export interface NormalizeResponse {
-  plan: unknown;
-  targetPayload: unknown;
-  appliedMappings: unknown;
-  skippedMappings: unknown;
-  validation?: {
-    valid: boolean;
-    errors?: Array<{
-      instancePath: string;
-      message?: string;
-    }>;
-  };
+
+/** Where the workflow stopped when a shipment was not created. */
+export type ShipmentFailureStage = 'canonical' | 'dhl' | 'send';
+
+export interface ShipmentFieldError {
+  field: string;
+  message: string;
 }
 
-/** What the gateway actually returns to the external caller of POST /shipments. */
 export type ShipmentResponse =
-  | { success: true; shipment: unknown }
-  | { success: false; errors: Array<{ field: string; message: string }> };
+  | { success: true; carrier: string; trackingNumber: string }
+  | { success: false; stage: ShipmentFailureStage; errors: ShipmentFieldError[] };

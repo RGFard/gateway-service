@@ -1,20 +1,20 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { ShipmentRouter } from './shipment-router.service.js';
-import type { NormalizeResponse, ShipmentResponse } from '../models/shipment-response.types.js';
+import type { ShipmentResponse } from '../models/shipment-response.types.js';
+import { parseWorkflowReply } from '../lib/workflow-reply.js';
+import { N8nWebhookError } from './n8n-client.service.js';
 
 export const SHIPMENT_SCHEMA_DOMAIN = 'shipment';
 export const SHIPMENT_CREATE_SCHEMA_NAME = 'shipment-create-request';
 
 /**
  * Gateway orchestration for POST /shipments:
- * receive → wrap correlation envelope → route to n8n → shape response for the caller.
+ * receive → wrap correlation envelope → route to n8n → check the reply → return it.
  *
- * The gateway does no semantic field mapping or presence/shape checking of its
- * own — the Integration Intelligence Engine downstream handles that (including
- * canonical schema validation, which already requires origin/destination/
- * packages, and tolerates whatever envelope shape the payload arrives in). The
- * gateway's own job here is routing plus trimming the engine's full internal
- * response down to what an external caller actually needs.
+ * The workflow normalizes the shipment, maps it to the carrier's format, sends it,
+ * and shapes the reply itself (success with a tracking number, or the stage it
+ * stopped at with errors). The gateway does no mapping or shaping of its own; it
+ * only refuses a reply that does not have that shape.
  */
 export class ShipmentService {
   constructor(
@@ -37,38 +37,32 @@ export class ShipmentService {
     this.log.info({ correlationId }, 'Routing shipment payload to n8n');
 
     const routed = await this.router.route(payload, correlationId, clientId, this.log);
+    const reply = parseWorkflowReply(routed.data);
+
+    if (!reply) {
+      this.log.error(
+        { correlationId, durationMs: routed.durationMs, upstreamStatus: routed.statusCode },
+        'n8n workflow reply did not have the expected shape',
+      );
+      throw new N8nWebhookError(
+        'Upstream workflow returned an unexpected response',
+        'UNEXPECTED_STATUS',
+        correlationId,
+        routed.statusCode,
+      );
+    }
 
     this.log.info(
       {
         correlationId,
         durationMs: routed.durationMs,
         upstreamStatus: routed.statusCode,
+        success: reply.success,
+        stage: reply.success ? undefined : reply.stage,
       },
-      'n8n workflow response received — shaping for caller',
+      'n8n workflow reply received',
     );
 
-    return this.shapeResponse(routed.data as NormalizeResponse);
-  }
-
-  /**
-   * The engine's full response (mapping plan, applied/skipped mappings,
-   * validation detail) is useful for us to see what it did, but the caller
-   * only needs the canonical result and, on failure, why. Everything else
-   * stays internal — visible in logs/n8n execution history, never forwarded.
-   */
-  private shapeResponse(engineResponse: NormalizeResponse): ShipmentResponse {
-    const valid = engineResponse.validation?.valid ?? true;
-
-    if (valid) {
-      return { success: true, shipment: engineResponse.targetPayload };
-    }
-
-    return {
-      success: false,
-      errors: (engineResponse.validation?.errors ?? []).map((e) => ({
-        field: e.instancePath || '(root)',
-        message: e.message ?? 'Validation failed',
-      })),
-    };
+    return reply;
   }
 }
