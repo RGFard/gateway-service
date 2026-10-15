@@ -11,9 +11,6 @@ import {
 import { ShipmentRouter } from '../services/shipment-router.service.js';
 import { ShipmentService } from '../services/shipment.service.js';
 
-/** Used when the caller sends no X-Target-System header, so existing callers keep working. */
-export const DEFAULT_TARGET_SYSTEM = 'dhl';
-
 const TARGET_SYSTEM_PATTERN = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 const SERVICE_CODE_PATTERN = /^[\x21-\x7e]{1,40}$/;
 
@@ -22,11 +19,20 @@ function headerValue(value: string | string[] | undefined): string | undefined {
   return v === undefined ? undefined : v.trim();
 }
 
-/** Reads X-Target-System and X-Service-Code. Returns an error message when either is malformed. */
+/**
+ * Reads X-Target-System (required) and X-Service-Code (optional). Returns an error message
+ * when the target is missing or either header is malformed.
+ */
 export function readShipmentTarget(
   headers: Record<string, string | string[] | undefined>,
 ): ShipmentTarget | { error: string } {
-  const system = (headerValue(headers['x-target-system']) || DEFAULT_TARGET_SYSTEM).toLowerCase();
+  const raw = headerValue(headers['x-target-system']);
+  if (!raw) {
+    return {
+      error: 'No target system determined: send the X-Target-System header (for example dhl or fedex)',
+    };
+  }
+  const system = raw.toLowerCase();
   if (!TARGET_SYSTEM_PATTERN.test(system)) {
     return { error: 'X-Target-System must be a system name such as dhl or fedex' };
   }

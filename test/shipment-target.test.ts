@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_TARGET_SYSTEM, readShipmentTarget } from '../src/routes/shipments.js';
+import { readShipmentTarget } from '../src/routes/shipments.js';
 import { parseWorkflowReply } from '../src/lib/workflow-reply.js';
 
-test('defaults to dhl when no header is sent', () => {
-  assert.equal(DEFAULT_TARGET_SYSTEM, 'dhl');
-  assert.deepEqual(readShipmentTarget({}), { system: 'dhl' });
+test('a missing or empty target header is an error', () => {
+  for (const headers of [{}, { 'x-target-system': '' }, { 'x-target-system': '  ' }]) {
+    const result = readShipmentTarget(headers);
+    assert.ok('error' in result);
+    assert.match(result.error, /No target system determined/);
+  }
 });
 
 test('reads and lowercases the target system, and passes the service code through', () => {
