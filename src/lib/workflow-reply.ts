@@ -4,7 +4,7 @@ import type {
   ShipmentResponse,
 } from '../models/shipment-response.types.js';
 
-const STAGES: readonly ShipmentFailureStage[] = ['canonical', 'dhl', 'send'];
+const STAGES: readonly ShipmentFailureStage[] = ['canonical', 'target', 'send', 'dhl'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

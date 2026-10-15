@@ -1,4 +1,4 @@
-import { createCorrelationEnvelope } from '../lib/correlation-envelope.js';
+import { createCorrelationEnvelope, type ShipmentTarget } from '../lib/correlation-envelope.js';
 import type { N8nClient, N8nInvokeSuccess } from './n8n-client.service.js';
 
 /**
@@ -17,8 +17,9 @@ export class ShipmentRouter {
     correlationId: string,
     clientId: string | undefined,
     log: Parameters<N8nClient['invoke']>[1],
+    target?: ShipmentTarget,
   ): Promise<N8nInvokeSuccess> {
-    const envelope = createCorrelationEnvelope(payload, correlationId, clientId);
+    const envelope = createCorrelationEnvelope(payload, correlationId, clientId, target);
 
     return this.n8nClient.invoke(
       {

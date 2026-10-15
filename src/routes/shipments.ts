@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import path from 'node:path';
+import type { ShipmentTarget } from '../lib/correlation-envelope.js';
 import { validateApiKey } from '../middleware/api-key.middleware.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import {
@@ -9,6 +10,32 @@ import {
 } from '../services/idempotency-store.js';
 import { ShipmentRouter } from '../services/shipment-router.service.js';
 import { ShipmentService } from '../services/shipment.service.js';
+
+/** Used when the caller sends no X-Target-System header, so existing callers keep working. */
+export const DEFAULT_TARGET_SYSTEM = 'dhl';
+
+const TARGET_SYSTEM_PATTERN = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+const SERVICE_CODE_PATTERN = /^[\x21-\x7e]{1,40}$/;
+
+function headerValue(value: string | string[] | undefined): string | undefined {
+  const v = Array.isArray(value) ? value[0] : value;
+  return v === undefined ? undefined : v.trim();
+}
+
+/** Reads X-Target-System and X-Service-Code. Returns an error message when either is malformed. */
+export function readShipmentTarget(
+  headers: Record<string, string | string[] | undefined>,
+): ShipmentTarget | { error: string } {
+  const system = (headerValue(headers['x-target-system']) || DEFAULT_TARGET_SYSTEM).toLowerCase();
+  if (!TARGET_SYSTEM_PATTERN.test(system)) {
+    return { error: 'X-Target-System must be a system name such as dhl or fedex' };
+  }
+  const serviceCode = headerValue(headers['x-service-code']);
+  if (serviceCode !== undefined && !SERVICE_CODE_PATTERN.test(serviceCode)) {
+    return { error: 'X-Service-Code must be 1 to 40 printable characters with no spaces' };
+  }
+  return serviceCode ? { system, serviceCode } : { system };
+}
 
 /** Where successful replies are remembered, relative to the folder the gateway runs from. */
 const IDEMPOTENCY_FILE = path.resolve('data', 'idempotency-keys.json');
@@ -31,12 +58,18 @@ export const shipmentRoutes: FastifyPluginAsync = async (app) => {
     },
     async (request, reply) => {
       const clientId = request.user?.sub;
+
+      const target = readShipmentTarget(request.headers);
+      if ('error' in target) {
+        return reply.status(400).send({ statusCode: 400, error: 'Bad Request', message: target.error });
+      }
+
       const header = request.headers['idempotency-key'];
       const key = Array.isArray(header) ? header[0] : header;
 
       // No key: behave exactly as before.
       if (key === undefined) {
-        return shipmentService.receive(request.body, request.correlationId, clientId);
+        return shipmentService.receive(request.body, request.correlationId, clientId, target);
       }
 
       if (!isValidIdempotencyKey(key)) {
@@ -47,7 +80,8 @@ export const shipmentRoutes: FastifyPluginAsync = async (app) => {
         });
       }
 
-      const requestHash = hashRequest(request.body);
+      // The target is part of the request: the same shipment sent to another carrier is a new shipment.
+      const requestHash = hashRequest({ target, body: request.body });
       const check = idempotency.begin(clientId, key, requestHash);
 
       if (check.kind === 'replay') {
@@ -71,7 +105,7 @@ export const shipmentRoutes: FastifyPluginAsync = async (app) => {
       }
 
       try {
-        const result = await shipmentService.receive(request.body, request.correlationId, clientId);
+        const result = await shipmentService.receive(request.body, request.correlationId, clientId, target);
         idempotency.finish(clientId, key, requestHash, result);
         return result;
       } catch (err) {

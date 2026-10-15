@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from 'fastify';
 import type { ShipmentRouter } from './shipment-router.service.js';
 import type { ShipmentResponse } from '../models/shipment-response.types.js';
+import type { ShipmentTarget } from '../lib/correlation-envelope.js';
 import { parseWorkflowReply } from '../lib/workflow-reply.js';
 import { N8nWebhookError } from './n8n-client.service.js';
 
@@ -26,6 +27,7 @@ export class ShipmentService {
     payload: unknown,
     correlationId: string,
     clientId?: string,
+    target?: ShipmentTarget,
   ): Promise<ShipmentResponse> {
     if (!clientId) {
       this.log.warn(
@@ -34,9 +36,9 @@ export class ShipmentService {
       );
     }
 
-    this.log.info({ correlationId }, 'Routing shipment payload to n8n');
+    this.log.info({ correlationId, target: target?.system }, 'Routing shipment payload to n8n');
 
-    const routed = await this.router.route(payload, correlationId, clientId, this.log);
+    const routed = await this.router.route(payload, correlationId, clientId, this.log, target);
     const reply = parseWorkflowReply(routed.data);
 
     if (!reply) {

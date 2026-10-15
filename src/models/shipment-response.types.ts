@@ -4,8 +4,12 @@
  * checks the shape and passes it through.
  */
 
-/** Where the workflow stopped when a shipment was not created. */
-export type ShipmentFailureStage = 'canonical' | 'dhl' | 'send';
+/**
+ * Where the workflow stopped when a shipment was not created:
+ * canonical (source data), target (mapping to the target system's format), send.
+ * 'dhl' is the earlier name for 'target', still accepted while the workflow changes over.
+ */
+export type ShipmentFailureStage = 'canonical' | 'target' | 'send' | 'dhl';
 
 export interface ShipmentFieldError {
   field: string;

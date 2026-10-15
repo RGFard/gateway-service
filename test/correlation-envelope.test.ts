@@ -15,3 +15,11 @@ test('omits clientId when not provided', () => {
 
   assert.equal('clientId' in envelope, false);
 });
+
+test('includes the target when provided, and omits it otherwise', () => {
+  const withTarget = createCorrelationEnvelope({}, 'corr-3', 'sub', { system: 'fedex', serviceCode: 'FEDEX_GROUND' });
+  assert.deepEqual(withTarget.target, { system: 'fedex', serviceCode: 'FEDEX_GROUND' });
+
+  const without = createCorrelationEnvelope({}, 'corr-4', 'sub');
+  assert.equal('target' in without, false);
+});
