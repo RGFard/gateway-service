@@ -8,6 +8,8 @@ export interface ShipmentTarget {
   system: string;
   /** The target's own service/product code (X-Service-Code header), when the caller sent one. */
   serviceCode?: string;
+  /** The shipper's account with the target, e.g. a FedEx account (X-Account-Number header). */
+  accountNumber?: string;
 }
 
 export interface CorrelationEnvelope<T = unknown> {

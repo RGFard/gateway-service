@@ -13,6 +13,7 @@ import { ShipmentService } from '../services/shipment.service.js';
 
 const TARGET_SYSTEM_PATTERN = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 const SERVICE_CODE_PATTERN = /^[\x21-\x7e]{1,40}$/;
+const ACCOUNT_NUMBER_PATTERN = /^[A-Za-z0-9-]{1,40}$/;
 
 function headerValue(value: string | string[] | undefined): string | undefined {
   const v = Array.isArray(value) ? value[0] : value;
@@ -20,8 +21,8 @@ function headerValue(value: string | string[] | undefined): string | undefined {
 }
 
 /**
- * Reads X-Target-System (required) and X-Service-Code (optional). Returns an error message
- * when the target is missing or either header is malformed.
+ * Reads X-Target-System (required), X-Service-Code and X-Account-Number (both optional).
+ * Returns an error message when the target is missing or any header is malformed.
  */
 export function readShipmentTarget(
   headers: Record<string, string | string[] | undefined>,
@@ -40,7 +41,15 @@ export function readShipmentTarget(
   if (serviceCode !== undefined && !SERVICE_CODE_PATTERN.test(serviceCode)) {
     return { error: 'X-Service-Code must be 1 to 40 printable characters with no spaces' };
   }
-  return serviceCode ? { system, serviceCode } : { system };
+  const accountNumber = headerValue(headers['x-account-number']);
+  if (accountNumber !== undefined && accountNumber !== '' && !ACCOUNT_NUMBER_PATTERN.test(accountNumber)) {
+    return { error: 'X-Account-Number must be 1 to 40 letters, digits or dashes' };
+  }
+  return {
+    system,
+    ...(serviceCode ? { serviceCode } : {}),
+    ...(accountNumber ? { accountNumber } : {}),
+  };
 }
 
 /** Where successful replies are remembered, relative to the folder the gateway runs from. */
