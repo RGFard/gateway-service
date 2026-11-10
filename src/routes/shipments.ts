@@ -10,6 +10,7 @@ import {
 } from '../services/idempotency-store.js';
 import { ShipmentRouter } from '../services/shipment-router.service.js';
 import { ShipmentService } from '../services/shipment.service.js';
+import { CarrierAccountStore } from '../services/carrier-account-store.js';
 
 const TARGET_SYSTEM_PATTERN = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 const SERVICE_CODE_PATTERN = /^[\x21-\x7e]{1,40}$/;
@@ -52,6 +53,23 @@ export function readShipmentTarget(
   };
 }
 
+/**
+ * Adds the client's stored account for this target when the caller sent no
+ * X-Account-Number. A header always wins, for clients with more than one account.
+ */
+export function withClientAccount(
+  target: ShipmentTarget,
+  clientId: string | undefined,
+  accounts: Pick<CarrierAccountStore, 'get'>,
+): ShipmentTarget {
+  if (target.accountNumber || !clientId) return target;
+  const accountNumber = accounts.get(clientId, target.system);
+  return accountNumber ? { ...target, accountNumber } : target;
+}
+
+/** Each client's carrier accounts (see CarrierAccountStore). Not committed: holds real accounts. */
+const CARRIER_ACCOUNTS_FILE = process.env.CARRIER_ACCOUNTS_FILE ?? path.resolve('data', 'carrier-accounts.json');
+
 /** Where successful replies are remembered, relative to the folder the gateway runs from. */
 const IDEMPOTENCY_FILE = path.resolve('data', 'idempotency-keys.json');
 
@@ -65,6 +83,7 @@ export const shipmentRoutes: FastifyPluginAsync = async (app) => {
   const router = new ShipmentRouter(app.n8nClient, app.config.N8N_WEBHOOK_URL);
   const shipmentService = new ShipmentService(app.log, router);
   const idempotency = new IdempotencyStore(IDEMPOTENCY_FILE);
+  const accounts = new CarrierAccountStore(CARRIER_ACCOUNTS_FILE);
 
   app.post(
     '/shipments',
@@ -74,9 +93,13 @@ export const shipmentRoutes: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const clientId = request.user?.sub;
 
-      const target = readShipmentTarget(request.headers);
-      if ('error' in target) {
-        return reply.status(400).send({ statusCode: 400, error: 'Bad Request', message: target.error });
+      const requested = readShipmentTarget(request.headers);
+      if ('error' in requested) {
+        return reply.status(400).send({ statusCode: 400, error: 'Bad Request', message: requested.error });
+      }
+      const target = withClientAccount(requested, clientId, accounts);
+      if (target.accountNumber && !requested.accountNumber) {
+        request.log.info({ clientId, system: target.system }, 'Carrier account added from the client account table');
       }
 
       const header = request.headers['idempotency-key'];

@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy to data/carrier-accounts.json (not committed) and fill in real accounts. Client ID (token sub) -> target system -> account number.",
+  "dev-user": {
+    "dhl": "123456789",
+    "fedex": "740561073"
+  }
+}
