@@ -1,0 +1,254 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai/webhook/shipment/",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -208,
+        208
+      ],
+      "id": "bb541d92-dca9-401b-95b8-655b4366a458",
+      "name": "Webhook",
+      "webhookId": "4721f819-12e0-46f6-bf40-dd4215546b3e"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.trackingNumber\n  ? { success: true, carrier: $('Webhook').item.json.body.target?.system, trackingNumber: $json.trackingNumber }\n  : $json.error\n  ? { success: false, stage: $('HTTP Request: Send to target').isExecuted ? \"send\" : \"target\",\n      errors: [{ field: \"(root)\", message: String($json.error.message ?? $json.error) }] }\n  : { success: false, stage: $json.target ? \"target\" : \"canonical\",\n      errors: ($json.validation?.errors ?? []).map(e => ({ field: e.canonicalField ?? e.header ?? (e.instancePath || \"(root)\"), message: e.message })) } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1056,
+        224
+      ],
+      "id": "8c143b0c-cfec-4e52-8e0e-c24463052fe0",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:3002/ai/normalize",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"sourcePayload\": $json.body.payload,\n  \"target\": {\n    \"domain\": \"shipment\",\n    \"schemaName\": \"shipment-create-request\"\n  },\n  \"options\": {\n    \"validateTarget\": {\n      \"domain\": \"shipment\",\n      \"schemaName\": \"shipment-create-request\"\n    },\n    \"clientId\": $json.body.clientId\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -16,
+        208
+      ],
+      "id": "f8c77d89-6b18-435d-9135-71dbf2d69448",
+      "name": "HTTP Request: Normalize to Canonical"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b324e685-4b3a-4d38-9d9c-0f4a4fdabd4e",
+              "leftValue": "={{ $json.validation.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        208
+      ],
+      "id": "6f4af57f-b097-41b6-9603-11881284bcb7",
+      "name": "If: Canonical valid?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:3002/outbound/transform",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"canonicalPayload\": $json.targetPayload,\n  \"target\": {\n    \"system\": $('Webhook').item.json.body.target?.system,\n    \"schemaName\": \"shipment-create-request\"\n  },\n  \"parameters\": Object.fromEntries(Object.entries({\n    \"serviceCode\": $('Webhook').item.json.body.target?.serviceCode,\n    \"accountNumber\": $('Webhook').item.json.body.target?.accountNumber\n  }).filter(([k, v]) => v))\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        432,
+        32
+      ],
+      "id": "8b762cb4-6ff3-4475-9dd6-7e037703fb77",
+      "name": "HTTP Request: Map canonical to target",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:3003/{{ $('Webhook').item.json.body.target.system }}/shipments",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.targetPayload }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        848,
+        32
+      ],
+      "id": "7fd8d214-6cdf-4b10-ac10-26e5c5c776c9",
+      "name": "HTTP Request: Send to terget",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2c5b1276-eaf3-463c-84d2-66bbf6a80cf6",
+              "leftValue": "={{ $json.validation.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        640,
+        32
+      ],
+      "id": "09c60f16-420d-497f-aeb0-e4cd0b0e4876",
+      "name": "If: Target payload valid?"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request: Normalize to Canonical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: Normalize to Canonical": {
+      "main": [
+        [
+          {
+            "node": "If: Canonical valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If: Canonical valid?": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request: Map canonical to target",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: Map canonical to target": {
+      "main": [
+        [
+          {
+            "node": "If: Target payload valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: Send to terget": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If: Target payload valid?": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request: Send to terget",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6407aaa7-747c-4fb2-beae-712307250164",
+  "meta": {
+    "instanceId": "58a3bf11fe35396ba45f78ee199cc40e6dd6b2abd9fe08cea5a8474de4aa46ff"
+  },
+  "id": "5hkKh3eVuebveQ3Z",
+  "tags": []
+}
