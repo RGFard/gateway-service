@@ -105,25 +105,6 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "=http://127.0.0.1:3003/{{ $('Webhook').item.json.body.target.system }}/shipments",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.targetPayload }}",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        848,
-        32
-      ],
-      "id": "7fd8d214-6cdf-4b10-ac10-26e5c5c776c9",
-      "name": "HTTP Request: Send to terget",
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
@@ -154,6 +135,25 @@
       ],
       "id": "09c60f16-420d-497f-aeb0-e4cd0b0e4876",
       "name": "If: Target payload valid?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:3003/{{ $('Webhook').item.json.body.target.system }}/shipments",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.targetPayload }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        848,
+        32
+      ],
+      "id": "7fd8d214-6cdf-4b10-ac10-26e5c5c776c9",
+      "name": "HTTP Request: Send to target",
+      "onError": "continueRegularOutput"
     }
   ],
   "pinData": {},
@@ -209,8 +209,15 @@
         ]
       ]
     },
-    "HTTP Request: Send to terget": {
+    "If: Target payload valid?": {
       "main": [
+        [
+          {
+            "node": "HTTP Request: Send to target",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Respond to Webhook",
@@ -220,15 +227,8 @@
         ]
       ]
     },
-    "If: Target payload valid?": {
+    "HTTP Request: Send to target": {
       "main": [
-        [
-          {
-            "node": "HTTP Request: Send to terget",
-            "type": "main",
-            "index": 0
-          }
-        ],
         [
           {
             "node": "Respond to Webhook",
@@ -245,7 +245,7 @@
     "binaryMode": "separate",
     "availableInMCP": false
   },
-  "versionId": "6407aaa7-747c-4fb2-beae-712307250164",
+  "versionId": "093b2d4c-b0dc-450d-bfc2-8d54b8cfd16f",
   "meta": {
     "instanceId": "58a3bf11fe35396ba45f78ee199cc40e6dd6b2abd9fe08cea5a8474de4aa46ff"
   },
